@@ -1,0 +1,123 @@
+use diesel::prelude::*;
+use diesel::result::{Error, DatabaseErrorKind};
+use regex::Regex;
+use serde::{Serialize, Serializer};
+
+use crate::schema::teachers;
+use crate::utils::password;
+use crate::models::Teacher;
+
+// <CreateError>
+#[derive(Debug)]
+pub enum CreateError {
+    EmailIsBlank,
+    EmailIsInvalid,
+    PasswordIsBlank,
+    PasswordIsTooShort,
+    UnexpectedError,
+}
+
+impl ToString for CreateError {
+    fn to_string(&self) -> String {
+        match self {
+            Self::EmailIsBlank => String::from("Email can't be blank"),
+            Self::EmailIsInvalid => String::from("Email is invalid"),
+            Self::PasswordIsBlank => String::from("Password can't be blank"),
+            // TODO: Give better feedback on password security
+            Self::PasswordIsTooShort => String::from("Password is too short (minimum is 8 characters)"),
+            Self::UnexpectedError => String::from("Unexpected error has occurred"),
+        }
+    }
+}
+
+impl Serialize for CreateError {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+// </CreateError>
+
+// <TeacherValues>
+#[derive(Insertable)]
+#[table_name="teachers"]
+struct TeacherValues<'a> {
+    email: &'a str,
+    password_digest: &'a str,
+}
+// </TeacherValues>
+
+// <Create>
+struct Create<'a> {
+    email: String,
+    password: String,
+    db: &'a PgConnection,
+}
+
+impl<'a> Create<'a> {
+    pub fn new(email: String, password: String, db: &'a PgConnection) -> Self {
+        Self {
+            email,
+            password,
+            db,
+        }
+    }
+
+    pub fn call(self) -> Result<(), Vec<CreateError>> {
+        self.validate()?
+            .insert_record()?
+            .finish()
+    }
+
+    fn validate(self) -> Result<Self, Vec<CreateError>> {
+        let mut errors = vec![];
+
+        // Email regex taken from the infamous https://stackoverflow.com/questions/201323/how-to-validate-an-email-address-using-a-regular-expression
+        let email_regex = Regex::new(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$").unwrap();
+        if self.email.trim().is_empty() {
+            errors.push(CreateError::EmailIsBlank);
+        } else if !email_regex.is_match(&self.email) {
+            errors.push(CreateError::EmailIsInvalid);
+        }
+
+        if self.password.trim().is_empty() {
+            errors.push(CreateError::PasswordIsBlank);
+        } else if self.password.trim().len() < 8 {
+            // TODO: Implement better password validation (maybe using zxcvbn-rs)
+            errors.push(CreateError::PasswordIsTooShort);
+        }
+
+        if errors.is_empty() {
+            Ok(self)
+        } else {
+            Err(errors)
+        }
+    }
+
+    fn insert_record(self) -> Result<Self, Vec<CreateError>> {
+        let values = TeacherValues {
+            email: &self.email,
+            password_digest: &password::digest(&self.password)
+                .map_err(|_| vec![CreateError::UnexpectedError])?,
+        };
+
+        match diesel::insert_into(teachers::table)
+            .values(&values)
+            .get_result::<Teacher>(self.db) {
+            Ok(_teacher) => Ok(self),
+            Err(err) => match err {
+                // If the email is already taken we still want to pretend that the sign up
+                // was successful - this is a security measure against email enumeration
+                // https://blog.rapid7.com/2017/06/15/about-user-enumeration
+                Error::DatabaseError(DatabaseErrorKind::UniqueViolation, _) => Ok(self),
+                _ => Err(vec![CreateError::UnexpectedError]),
+            }
+        }
+    }
+
+    fn finish(self) -> Result<(), Vec<CreateError>> { Ok(()) }
+}
+// </Create>
+
+pub fn create(email: String, password: String, db: &PgConnection) -> Result<(), Vec<CreateError>> {
+    Create::new(email, password, db).call()
+}
