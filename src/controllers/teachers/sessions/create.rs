@@ -1,17 +1,13 @@
 use serde::{Serialize, Deserialize};
 use actix_web::{web, post, HttpResponse, Responder};
 
-use crate::{DbPool, services::teachers::{create, CreateError}};
+use crate::{DbPool, services::teachers::sessions::{create, CreateError}};
 use actix_web::rt::blocking::BlockingError;
 
 #[derive(Deserialize)]
 pub struct Params {
   email: String,
   password: String,
-}
-
-#[derive(Serialize)]
-struct SuccessResponse {
 }
 
 #[derive(Serialize)]
@@ -27,7 +23,7 @@ pub async fn action(db: web::Data<DbPool>, params: web::Json<Params>) -> impl Re
   match web::block(move || {
     create(params.email, params.password,&conn)
   }).await {
-    Ok(_) => HttpResponse::Created().json(SuccessResponse { }),
+    Ok(session) => HttpResponse::Created().json(session),
     Err(err) => match err {
       BlockingError::Error(Some(errors)) => (
         HttpResponse::BadRequest().json(ErrorResponse { errors })

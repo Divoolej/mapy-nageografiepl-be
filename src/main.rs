@@ -3,6 +3,7 @@
 use actix_web::{web, middleware, App, HttpServer};
 use diesel::prelude::*;
 use diesel::r2d2::{Pool, ConnectionManager};
+use env_logger;
 
 mod utils;
 mod schema;
@@ -15,7 +16,10 @@ pub type DbPool = Pool<ConnectionManager<PgConnection>>;
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
   // Load ENVs
+  std::env::set_var("RUST_LOG", "debug");
   dotenv::dotenv().ok();
+  // Set up logger
+  env_logger::init();
   // Set up PostgreSQL connection pool
   let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
   let connection_manager = ConnectionManager::<PgConnection>::new(database_url);

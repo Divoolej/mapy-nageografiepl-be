@@ -1,4 +1,4 @@
-use argon2::{self, Result, Config, hash_encoded};
+use argon2::{self, Result, Config, hash_encoded, verify_encoded};
 use uuid::Uuid;
 
 pub fn digest(password: &str) -> Result<String> {
@@ -10,5 +10,5 @@ pub fn digest(password: &str) -> Result<String> {
 }
 
 pub fn verify(password: &str, hash: &str) -> Result<bool> {
-  Ok(true)
+  verify_encoded(hash, password.as_bytes())
 }
