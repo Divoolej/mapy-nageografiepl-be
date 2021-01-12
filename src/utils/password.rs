@@ -8,3 +8,7 @@ pub fn digest(password: &str) -> Result<String> {
     &Config::default(),
   )
 }
+
+pub fn verify(password: &str, hash: &str) -> Result<bool> {
+  Ok(true)
+}

@@ -29,7 +29,8 @@ pub async fn action(db: web::Data<DbPool>, params: web::Json<Params>) -> impl Re
   }).await {
     Ok(_) => HttpResponse::Created().json(SuccessResponse { }),
     Err(err) => match err {
-      BlockingError::Error(errors) => (
+      BlockingError::Error(None) => HttpResponse::InternalServerError().body("Unexpected error has occurred"),
+      BlockingError::Error(Some(errors)) => (
         HttpResponse::BadRequest()
           .json(ErrorResponse { errors })
       ),

@@ -1,11 +1,7 @@
-use serde::{Deserialize, Serialize};
-
-#[derive(Queryable, Serialize, Deserialize)]
+#[derive(Queryable)]
 pub struct Teacher {
     pub id: i32,
     pub email: String,
-    #[serde(skip_serializing)]
     pub password_digest: String,
-    #[serde(skip_serializing)]
     pub auth_token: Option<String>,
 }

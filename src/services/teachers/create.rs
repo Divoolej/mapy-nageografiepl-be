@@ -14,7 +14,6 @@ pub enum CreateError {
     EmailIsInvalid,
     PasswordIsBlank,
     PasswordIsTooShort,
-    UnexpectedError,
 }
 
 impl ToString for CreateError {
@@ -25,7 +24,6 @@ impl ToString for CreateError {
             Self::PasswordIsBlank => String::from("Password can't be blank"),
             // TODO: Give better feedback on password security
             Self::PasswordIsTooShort => String::from("Password is too short (minimum is 8 characters)"),
-            Self::UnexpectedError => String::from("Unexpected error has occurred"),
         }
     }
 }
@@ -62,13 +60,13 @@ impl<'a> Create<'a> {
         }
     }
 
-    pub fn call(self) -> Result<(), Vec<CreateError>> {
+    pub fn call(self) -> Result<(), Option<Vec<CreateError>>> {
         self.validate()?
             .insert_record()?
             .finish()
     }
 
-    fn validate(self) -> Result<Self, Vec<CreateError>> {
+    fn validate(self) -> Result<Self, Option<Vec<CreateError>>> {
         let mut errors = vec![];
 
         // Email regex taken from the infamous https://stackoverflow.com/questions/201323/how-to-validate-an-email-address-using-a-regular-expression
@@ -89,15 +87,15 @@ impl<'a> Create<'a> {
         if errors.is_empty() {
             Ok(self)
         } else {
-            Err(errors)
+            Err(Some(errors))
         }
     }
 
-    fn insert_record(self) -> Result<Self, Vec<CreateError>> {
+    fn insert_record(self) -> Result<Self, Option<Vec<CreateError>>> {
         let values = TeacherValues {
             email: &self.email,
             password_digest: &password::digest(&self.password)
-                .map_err(|_| vec![CreateError::UnexpectedError])?,
+                .map_err(|_| None)?,
         };
 
         match diesel::insert_into(teachers::table)
@@ -109,15 +107,15 @@ impl<'a> Create<'a> {
                 // was successful - this is a security measure against email enumeration
                 // https://blog.rapid7.com/2017/06/15/about-user-enumeration
                 Error::DatabaseError(DatabaseErrorKind::UniqueViolation, _) => Ok(self),
-                _ => Err(vec![CreateError::UnexpectedError]),
+                _ => Err(None),
             }
         }
     }
 
-    fn finish(self) -> Result<(), Vec<CreateError>> { Ok(()) }
+    fn finish(self) -> Result<(), Option<Vec<CreateError>>> { Ok(()) }
 }
 // </Create>
 
-pub fn create(email: String, password: String, db: &PgConnection) -> Result<(), Vec<CreateError>> {
+pub fn create(email: String, password: String, db: &PgConnection) -> Result<(), Option<Vec<CreateError>>> {
     Create::new(email, password, db).call()
 }
