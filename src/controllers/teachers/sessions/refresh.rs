@@ -15,7 +15,6 @@ use crate::{
 
 #[derive(Deserialize)]
 pub struct Params {
-  owner_uuid: String,
   refresh_token: String,
 }
 
@@ -30,13 +29,13 @@ struct ErrorResponse {
   errors: Vec<RefreshError>,
 }
 
-#[patch("/refresh")]
-pub async fn action(db: web::Data<DbPool>, params: web::Json<Params>) -> impl Responder {
+#[patch("/{session_uuid}/refresh")]
+pub async fn action(web::Path(session_uuid): web::Path<String>, db: web::Data<DbPool>, params: web::Json<Params>) -> impl Responder {
   let conn = db_connect!(db);
   let params = params.into_inner();
 
   match web::block(move || {
-    refresh(params.owner_uuid, params.refresh_token, &conn)
+    refresh(session_uuid, params.refresh_token, &conn)
   }).await {
     Ok(session) => HttpResponse::Ok().json(SuccessResponse {
       access_token: session.access_token,
@@ -44,6 +43,7 @@ pub async fn action(db: web::Data<DbPool>, params: web::Json<Params>) -> impl Re
     }),
     Err(BlockingError::Error(refresh_errors)) => match refresh_errors {
       RefreshErrors::Multiple(errors) => HttpResponse::BadRequest().json(ErrorResponse { errors }),
+      RefreshErrors::SessionNotFound => HttpResponse::NotFound().body("Not Found"),
       RefreshErrors::Unauthorized => HttpResponse::Unauthorized().body("Unauthorized"),
       RefreshErrors::UnexpectedError => HttpResponse::InternalServerError().body("Unexpected error has occurred"),
     },

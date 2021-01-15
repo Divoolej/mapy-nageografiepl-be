@@ -15,6 +15,7 @@ use chrono::{DateTime, Utc, Duration};
 #[derive(Debug)]
 pub enum RefreshErrors {
   UnexpectedError,
+  SessionNotFound,
   Unauthorized,
   Multiple(Vec<RefreshError>),
 }
@@ -23,14 +24,14 @@ pub enum RefreshErrors {
 // <RefreshErrors>
 #[derive(Debug)]
 pub enum RefreshError {
-  OwnerUuidIsBlank,
+  SessionUuidIsBlank,
   RefreshTokenIsBlank,
 }
 
 impl ToString for RefreshError {
   fn to_string(&self) -> String {
     match self {
-      Self::OwnerUuidIsBlank => String::from("Owner UUID can't be blank"),
+      Self::SessionUuidIsBlank => String::from("Session UUID can't be blank"),
       Self::RefreshTokenIsBlank => String::from("Refresh token can't be blank")
     }
   }
@@ -43,31 +44,20 @@ impl Serialize for RefreshError {
 }
 // </RefreshError>
 
-// <SessionValues>
-#[derive(Insertable)]
-#[table_name="sessions"]
-struct SessionValues<'a> {
-    owner_uuid: &'a str,
-    access_token: String,
-    access_token_expires_at: DateTime<Utc>,
-}
-
-// </SessionValues>
-
 // <Refresh>
 struct Refresh<'a> {
-  owner_uuid: String,
+  session_uuid: String,
   refresh_token: String,
   db: &'a PgConnection,
   session: Option<Session>,
 }
 
 impl<'a> Refresh<'a> {
-  pub fn new(owner_uuid: String, refresh_token: String, db: &'a PgConnection) -> Self {
+  pub fn new(session_uuid: String, refresh_token: String, db: &'a PgConnection) -> Self {
     Self {
       session: None,
       refresh_token,
-      owner_uuid,
+      session_uuid,
       db,
     }
   }
@@ -75,6 +65,7 @@ impl<'a> Refresh<'a> {
   pub fn call(self) -> Result<Session, RefreshErrors> {
     self.validate()?
         .get_session()?
+        .authenticate()?
         .update_session()?
         .finish()
   }
@@ -82,7 +73,7 @@ impl<'a> Refresh<'a> {
   fn validate(self) -> Result<Self, RefreshErrors> {
     let mut errors = vec![];
 
-    if self.owner_uuid.trim().is_empty() { errors.push(RefreshError::OwnerUuidIsBlank); }
+    if self.session_uuid.trim().is_empty() { errors.push(RefreshError::SessionUuidIsBlank); }
     if self.refresh_token.trim().is_empty() { errors.push(RefreshError::RefreshTokenIsBlank); }
 
     if errors.is_empty() {
@@ -97,16 +88,24 @@ impl<'a> Refresh<'a> {
 
     match sessions.filter(
       owner_type.eq("teacher")
-          .and(owner_uuid.eq(&self.owner_uuid))
-          .and(refresh_token.eq(&self.refresh_token))
-        ).first::<Session>(self.db) {
+          .and(uuid.eq(&self.session_uuid))
+    ).first::<Session>(self.db) {
       Ok(session) => {
         self.session = Some(session);
         Ok(self)
       },
-      Err(Error::NotFound) => Err(RefreshErrors::Unauthorized),
+      Err(Error::NotFound) => Err(RefreshErrors::SessionNotFound),
       // Handle unexpected database-level errors:
       Err(error) => handle_unexpected_err!(error, RefreshErrors::UnexpectedError),
+    }
+  }
+
+  fn authenticate(self) -> Result<Self, RefreshErrors> {
+    // The unwrap is safe as we ensure session presence in #get_session
+    if self.session.as_ref().unwrap().refresh_token == self.refresh_token {
+      Ok(self)
+    } else {
+      Err(RefreshErrors::Unauthorized)
     }
   }
 
