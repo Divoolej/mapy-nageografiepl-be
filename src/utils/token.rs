@@ -2,7 +2,7 @@ use base64;
 use rand::Rng;
 
 pub fn generate() -> String {
-    let mut bytes = [0u8, 20];
+    let mut bytes = [0u8; 20];
     let mut rng = rand::thread_rng();
 
     for x in bytes.iter_mut() {

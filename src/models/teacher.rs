@@ -1,6 +1,8 @@
 use chrono::{DateTime, Utc};
 
-#[derive(Queryable)]
+use crate::schema::teachers;
+
+#[derive(Identifiable, Queryable, Debug)]
 pub struct Teacher {
     pub id: i32,
     pub uuid: String,

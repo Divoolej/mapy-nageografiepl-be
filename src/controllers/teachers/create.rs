@@ -1,5 +1,6 @@
-use serde::{Serialize, Deserialize};
 use actix_web::{web, post, HttpResponse, Responder};
+use serde::{Serialize, Deserialize};
+use log::error;
 
 use crate::{DbPool, services::teachers::{create, CreateError}};
 use actix_web::rt::blocking::BlockingError;
@@ -28,11 +29,12 @@ pub async fn action(db: web::Data<DbPool>, params: web::Json<Params>) -> impl Re
     create(params.email, params.password,&conn)
   }).await {
     Ok(_) => HttpResponse::Created().json(SuccessResponse { }),
-    Err(err) => match err {
-      BlockingError::Error(Some(errors)) => (
-        HttpResponse::BadRequest().json(ErrorResponse { errors })
-      ),
-      _ => HttpResponse::InternalServerError().body("Unexpected error has occurred"),
+    Err(BlockingError::Error(Some(errors))) => (
+      HttpResponse::BadRequest().json(ErrorResponse { errors })
+    ),
+    Err(err) => {
+      error!("{:?}", err);
+      HttpResponse::InternalServerError().body("Unexpected error has occurred")
     },
   }
 }
