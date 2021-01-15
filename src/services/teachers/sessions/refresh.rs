@@ -3,9 +3,9 @@ use diesel::pg::Pg;
 use diesel::prelude::*;
 use diesel::result::Error;
 
-use log::error;
 use serde::{Serialize, Serializer};
 
+use crate::handle_unexpected_err;
 use crate::schema::sessions;
 use crate::utils::{password, token};
 use crate::models::Session;
@@ -104,14 +104,9 @@ impl<'a> Refresh<'a> {
         self.session = Some(session);
         Ok(self)
       },
-      Err(err) => match err {
-        Error::NotFound => Err(RefreshErrors::Unauthorized),
-        // Handle unexpected database-level errors:
-        error => {
-          error!("{:?}", error);
-          Err(RefreshErrors::UnexpectedError)
-        },
-      }
+      Err(Error::NotFound) => Err(RefreshErrors::Unauthorized),
+      // Handle unexpected database-level errors:
+      Err(error) => handle_unexpected_err!(error, RefreshErrors::UnexpectedError),
     }
   }
 
@@ -127,10 +122,7 @@ impl<'a> Refresh<'a> {
         self.session = Some(session);
         Ok(self)
       }
-      Err(err) => {
-        error!("{:?}", err);
-        Err(RefreshErrors::UnexpectedError)
-      }
+      Err(error) => handle_unexpected_err!(error, RefreshErrors::UnexpectedError),
     }
   }
 

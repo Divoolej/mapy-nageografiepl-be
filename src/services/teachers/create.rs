@@ -1,9 +1,10 @@
 use diesel::prelude::*;
 use diesel::result::{Error, DatabaseErrorKind};
-use log::error;
+
 use regex::Regex;
 use serde::{Serialize, Serializer};
 
+use crate::{report_unexpected_err, handle_unexpected_err};
 use crate::schema::teachers;
 use crate::utils::password;
 use crate::models::Teacher;
@@ -109,8 +110,8 @@ impl<'a> Create<'a> {
       &self.email,
       password::digest(&self.password)
           .map_err(|error| {
-            // Handle unexpected errors from argon2:
-            error!("{}", error);
+            // Report unexpected errors from argon2
+            report_unexpected_err!(error);
             None
           })?,
     );
@@ -119,17 +120,12 @@ impl<'a> Create<'a> {
         .values(&values)
         .get_result::<Teacher>(self.db) {
       Ok(_) => Ok(self),
-      Err(err) => match err {
-        // If the email is already taken we still want to pretend that the sign up
-        // was successful - this is a security measure against email enumeration
-        // https://blog.rapid7.com/2017/06/15/about-user-enumeration
-        Error::DatabaseError(DatabaseErrorKind::UniqueViolation, _) => Ok(self),
-        // Handle unexpected database-level errors:
-        error => {
-          error!("{}", error);
-          Err(None)
-        },
-      }
+      // If the email is already taken we still want to pretend that the sign up
+      // was successful - this is a security measure against email enumeration
+      // https://blog.rapid7.com/2017/06/15/about-user-enumeration
+      Err(Error::DatabaseError(DatabaseErrorKind::UniqueViolation, _)) => Ok(self),
+      // Handle unexpected database-level errors:
+      Err(error) => handle_unexpected_err!(error, None),
     }
   }
 

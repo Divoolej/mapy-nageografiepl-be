@@ -1,3 +1,3 @@
-DROP INDEX IF EXISTS teachers_uuid;
-DROP INDEX IF EXISTS teachers_unique_email;
-DROP TABLE IF EXISTS teachers;
+DROP INDEX teachers_uuid;
+DROP INDEX teachers_unique_email;
+DROP TABLE teachers;

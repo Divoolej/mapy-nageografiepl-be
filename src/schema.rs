@@ -1,6 +1,7 @@
 table! {
     sessions (id) {
         id -> Int4,
+        uuid -> Varchar,
         owner_type -> Varchar,
         owner_uuid -> Varchar,
         refresh_token -> Varchar,

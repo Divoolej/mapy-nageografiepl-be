@@ -1,5 +1,6 @@
 CREATE TABLE sessions (
   id SERIAL PRIMARY KEY,
+  uuid VARCHAR NOT NULL,
   owner_type VARCHAR NOT NULL,
   owner_uuid VARCHAR NOT NULL,
   refresh_token VARCHAR NOT NULL,
@@ -11,6 +12,7 @@ CREATE TABLE sessions (
 );
 
 CREATE INDEX sessions_owner_uuid ON sessions(owner_uuid);
+CREATE UNIQUE INDEX sessions_unique_uuid ON sessions(uuid);
 CREATE UNIQUE INDEX sessions_unique_access_token ON sessions(access_token);
 CREATE UNIQUE INDEX sessions_unique_refresh_token ON sessions(refresh_token);
 

@@ -3,7 +3,15 @@ use chrono::{DateTime, Utc};
 use log::error;
 use serde::{Serialize, Deserialize};
 
-use crate::{DbPool, services::teachers::sessions::{refresh, RefreshErrors, RefreshError}};
+use crate::{
+  db_connect,
+  DbPool,
+  services::teachers::sessions::{
+    refresh,
+    RefreshErrors,
+    RefreshError
+  }
+};
 
 #[derive(Deserialize)]
 pub struct Params {
@@ -24,7 +32,7 @@ struct ErrorResponse {
 
 #[patch("/refresh")]
 pub async fn action(db: web::Data<DbPool>, params: web::Json<Params>) -> impl Responder {
-  let conn = db.get().expect("Couldn't get a database connection");
+  let conn = db_connect!(db);
   let params = params.into_inner();
 
   match web::block(move || {

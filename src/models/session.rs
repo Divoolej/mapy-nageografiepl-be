@@ -5,7 +5,8 @@ use crate::schema::sessions;
 
 #[derive(Identifiable, Queryable, Serialize, Debug)]
 pub struct Session {
-    pub id: i32,
+    #[serde(skip_serializing)] pub id: i32,
+    pub uuid: String,
     #[serde(skip_serializing)] pub owner_type: String,
     pub owner_uuid: String,
     pub refresh_token: String,

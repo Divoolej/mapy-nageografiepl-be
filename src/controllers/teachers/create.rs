@@ -1,9 +1,15 @@
-use actix_web::{web, post, HttpResponse, Responder};
+use actix_web::{web, post, rt::blocking::BlockingError, HttpResponse, Responder};
 use serde::{Serialize, Deserialize};
 use log::error;
 
-use crate::{DbPool, services::teachers::{create, CreateError}};
-use actix_web::rt::blocking::BlockingError;
+use crate::{
+  db_connect,
+  DbPool,
+  services::teachers::{
+    create,
+    CreateError,
+  },
+};
 
 #[derive(Deserialize)]
 pub struct Params {
@@ -22,7 +28,7 @@ struct ErrorResponse {
 
 #[post("")]
 pub async fn action(db: web::Data<DbPool>, params: web::Json<Params>) -> impl Responder {
-  let conn = db.get().expect("Couldn't get a database connection");
+  let conn = db_connect!(db);
   let params = params.into_inner();
 
   match web::block(move || {

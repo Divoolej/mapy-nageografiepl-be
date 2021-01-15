@@ -3,10 +3,12 @@ use diesel::result::Error;
 use log::error;
 use serde::{Serialize, Serializer};
 
+use crate::handle_unexpected_err;
 use crate::schema::sessions;
 use crate::utils::{password, token};
 use crate::models::{Session, Teacher};
 use chrono::{DateTime, Utc, Duration};
+use uuid::Uuid;
 
 // <CreateError>
 #[derive(Debug)]
@@ -38,6 +40,7 @@ impl Serialize for CreateError {
 #[derive(Insertable)]
 #[table_name="sessions"]
 struct SessionValues<'a> {
+    uuid: String,
     owner_type: String,
     owner_uuid: &'a str,
     access_token: String,
@@ -49,6 +52,7 @@ struct SessionValues<'a> {
 impl<'a> SessionValues<'a> {
   fn new(teacher_uuid: &'a str) -> Self {
     Self {
+      uuid: Uuid::new_v4().to_string(),
       owner_type: String::from("teacher"),
       owner_uuid: teacher_uuid,
       access_token: token::generate(),
@@ -111,14 +115,9 @@ impl<'a> Create<'a> {
         self.teacher = Some(teacher);
         Ok(self)
       },
-      Err(err) => match err {
-        Error::NotFound => Err(Some(vec![CreateError::EmailNotFound])),
-        // Handle unexpected database-level errors:
-        error => {
-          error!("{}", error);
-          Err(None)
-        },
-      }
+      Err(Error::NotFound) => Err(Some(vec![CreateError::EmailNotFound])),
+      // Handle unexpected database-level errors:
+      Err(error) => handle_unexpected_err!(error, None),
     }
   }
 
@@ -128,10 +127,7 @@ impl<'a> Create<'a> {
       Ok(true) => Ok(self),
       Ok(false) => Err(Some(vec![CreateError::PasswordDoesntMatch])),
       // Handle unexpected errors from argon2:
-      Err(error) => {
-        error!("{}", error);
-        Err(None)
-      },
+      Err(error) => handle_unexpected_err!(error, None),
     }
   }
 
@@ -147,10 +143,7 @@ impl<'a> Create<'a> {
         Ok(self)
       },
       // Handle unexpected database-level errors:
-      Err(error) => {
-        error!("{}", error);
-        Err(None)
-      },
+      Err(error) => handle_unexpected_err!(error, None),
     }
   }
 
