@@ -37,6 +37,7 @@ async fn main() -> std::io::Result<()> {
   // Set up logger
   env_logger::init();
   // Set up Rollbar
+  // TODO: Expand macro and add regular logging
   report_panics!(ROLLBAR_CLIENT);
   // Set up PostgreSQL connection pool
   let database_url = env::var("DATABASE_URL").expect("DATABASE_URL is not set");

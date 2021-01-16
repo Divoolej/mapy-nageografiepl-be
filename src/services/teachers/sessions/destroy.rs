@@ -1,32 +1,30 @@
-use chrono::{Duration, Utc};
 use diesel::{prelude::*, result::Error};
 
 use crate::models::Session;
 use crate::prelude::*;
-use crate::utils::token;
 
-// <RefreshErrors>
+// <DestroyErrors>
 #[derive(Debug)]
-pub enum RefreshErrors {
+pub enum DestroyErrors {
   UnexpectedError,
   SessionNotFound,
   Unauthorized,
-  Multiple(Vec<RefreshError>),
+  Multiple(Vec<DestroyError>),
 }
-// </RefreshErrors>
+// </DestroyErrors>
 
-// <RefreshError>
+// <DestroyError>
 #[derive(Debug)]
-pub enum RefreshError {
+pub enum DestroyError {
   SessionUuidIsBlank,
   RefreshTokenIsBlank,
 }
 
-make_serializable!(RefreshError {
+make_serializable!(DestroyError {
   SessionUuidIsBlank => "Session UUID can't be blank",
   RefreshTokenIsBlank => "Refresh token can't be blank"
 });
-// </RefreshError>
+// </DestroyError>
 
 // <Refresh>
 struct Refresh<'a> {
@@ -46,33 +44,33 @@ impl<'a> Refresh<'a> {
     }
   }
 
-  pub fn call(self) -> Result<Session, RefreshErrors> {
+  pub fn call(self) -> Result<(), DestroyErrors> {
     self
       .validate()?
       .get_session()?
       .authenticate()?
-      .update_session()?
+      .delete_session()?
       .finish()
   }
 
-  fn validate(self) -> Result<Self, RefreshErrors> {
+  fn validate(self) -> Result<Self, DestroyErrors> {
     let mut errors = vec![];
 
     if self.session_uuid.trim().is_empty() {
-      errors.push(RefreshError::SessionUuidIsBlank);
+      errors.push(DestroyError::SessionUuidIsBlank);
     }
     if self.refresh_token.trim().is_empty() {
-      errors.push(RefreshError::RefreshTokenIsBlank);
+      errors.push(DestroyError::RefreshTokenIsBlank);
     }
 
     if errors.is_empty() {
       Ok(self)
     } else {
-      Err(RefreshErrors::Multiple(errors))
+      Err(DestroyErrors::Multiple(errors))
     }
   }
 
-  fn get_session(mut self) -> Result<Self, RefreshErrors> {
+  fn get_session(mut self) -> Result<Self, DestroyErrors> {
     use crate::schema::sessions::dsl::*;
 
     match sessions
@@ -83,47 +81,41 @@ impl<'a> Refresh<'a> {
         self.session = Some(session);
         Ok(self)
       }
-      Err(Error::NotFound) => Err(RefreshErrors::SessionNotFound),
+      Err(Error::NotFound) => Err(DestroyErrors::SessionNotFound),
       // Handle unexpected database-level errors:
-      Err(error) => handle_unexpected_err!(error, RefreshErrors::UnexpectedError),
+      Err(error) => handle_unexpected_err!(error, DestroyErrors::UnexpectedError),
     }
   }
 
-  fn authenticate(self) -> Result<Self, RefreshErrors> {
+  fn authenticate(self) -> Result<Self, DestroyErrors> {
     // This unwrap is safe as we ensure session presence in #get_session
     if self.session.as_ref().unwrap().refresh_token == self.refresh_token {
       Ok(self)
     } else {
-      Err(RefreshErrors::Unauthorized)
+      Err(DestroyErrors::Unauthorized)
     }
   }
 
-  fn update_session(mut self) -> Result<Self, RefreshErrors> {
-    use crate::schema::sessions::dsl::*;
+  fn delete_session(mut self) -> Result<Self, DestroyErrors> {
     // This unwrap is safe as we ensure session presence in #get_session
-    match diesel::update(&self.session.unwrap())
-      .set((
-        access_token.eq(token::generate()),
-        access_token_expires_at.eq(Utc::now() + Duration::days(1)),
-      ))
-      .get_result::<Session>(self.db)
-    {
-      Ok(session) => {
-        self.session = Some(session);
+    match diesel::delete(&self.session.unwrap()).execute(self.db) {
+      Ok(1) => {
+        self.session = None;
         Ok(self)
       }
-      Err(error) => handle_unexpected_err!(error, RefreshErrors::UnexpectedError),
+      Ok(_) => unreachable!("Record was deleted but rows affected != 1!"),
+      Err(error) => handle_unexpected_err!(error, DestroyErrors::UnexpectedError),
     }
   }
 
-  fn finish(self) -> Result<Session, RefreshErrors> {
+  fn finish(self) -> Result<(), DestroyErrors> {
     // The unwrap is safe because we check for errors in update_session
     // and nothing else mutates the object in the meantime
-    Ok(self.session.unwrap())
+    Ok(())
   }
 }
 // </Refresh>
 
-pub fn refresh(owner_uuid: String, refresh_token: String, db: &PgConnection) -> Result<Session, RefreshErrors> {
+pub fn destroy(owner_uuid: String, refresh_token: String, db: &PgConnection) -> Result<(), DestroyErrors> {
   Refresh::new(owner_uuid, refresh_token, db).call()
 }

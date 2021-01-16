@@ -76,7 +76,9 @@ impl<'a> Create<'a> {
     let mut errors = vec![];
 
     // Email regex taken from the infamous https://stackoverflow.com/questions/201323/how-to-validate-an-email-address-using-a-regular-expression
-    let email_regex = Regex::new(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$").unwrap();
+    // This unwrap is safe, because, well, I tested it?
+    let email_regex =
+      Regex::new(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$").expect("Error parsing regular expression");
     if self.email.trim().is_empty() {
       errors.push(CreateError::EmailIsBlank);
     } else if !email_regex.is_match(&self.email) {
