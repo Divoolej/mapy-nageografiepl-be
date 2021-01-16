@@ -1,5 +1,5 @@
-mod teacher;
 mod session;
+mod teacher;
 
-pub use teacher::Teacher;
 pub use session::Session;
+pub use teacher::Teacher;

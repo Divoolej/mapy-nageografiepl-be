@@ -1,15 +1,8 @@
-use chrono::{Utc, Duration};
-use diesel::{
-  prelude::*,
-  result::Error,
-};
+use chrono::{Duration, Utc};
+use diesel::{prelude::*, result::Error};
 use serde::{Serialize, Serializer};
 
-use crate::{
-  handle_unexpected_err, make_serializable,
-  utils::token,
-  models::Session,
-};
+use crate::{handle_unexpected_err, make_serializable, models::Session, utils::token};
 
 // <RefreshErrors>
 #[derive(Debug)]
@@ -63,8 +56,12 @@ impl<'a> Refresh<'a> {
   fn validate(self) -> Result<Self, RefreshErrors> {
     let mut errors = vec![];
 
-    if self.session_uuid.trim().is_empty() { errors.push(RefreshError::SessionUuidIsBlank); }
-    if self.refresh_token.trim().is_empty() { errors.push(RefreshError::RefreshTokenIsBlank); }
+    if self.session_uuid.trim().is_empty() {
+      errors.push(RefreshError::SessionUuidIsBlank);
+    }
+    if self.refresh_token.trim().is_empty() {
+      errors.push(RefreshError::RefreshTokenIsBlank);
+    }
 
     if errors.is_empty() {
       Ok(self)
@@ -76,14 +73,13 @@ impl<'a> Refresh<'a> {
   fn get_session(mut self) -> Result<Self, RefreshErrors> {
     use crate::schema::sessions::dsl::*;
 
-    match sessions.filter(
-      owner_type.eq("teacher")
-          .and(uuid.eq(&self.session_uuid))
-    ).first::<Session>(self.db) {
+    match sessions
+        .filter(owner_type.eq("teacher").and(uuid.eq(&self.session_uuid)))
+        .first::<Session>(self.db) {
       Ok(session) => {
         self.session = Some(session);
         Ok(self)
-      },
+      }
       Err(Error::NotFound) => Err(RefreshErrors::SessionNotFound),
       // Handle unexpected database-level errors:
       Err(error) => handle_unexpected_err!(error, RefreshErrors::UnexpectedError),
@@ -106,7 +102,8 @@ impl<'a> Refresh<'a> {
         .set((
           access_token.eq(token::generate()),
           access_token_expires_at.eq(Utc::now() + Duration::days(1)),
-        )).get_result::<Session>(self.db) {
+        ))
+        .get_result::<Session>(self.db) {
       Ok(session) => {
         self.session = Some(session);
         Ok(self)
@@ -123,6 +120,10 @@ impl<'a> Refresh<'a> {
 }
 // </Refresh>
 
-pub fn refresh(owner_uuid: String, refresh_token: String, db: &PgConnection) -> Result<Session, RefreshErrors> {
+pub fn refresh(
+  owner_uuid: String,
+  refresh_token: String,
+  db: &PgConnection,
+) -> Result<Session, RefreshErrors> {
   Refresh::new(owner_uuid, refresh_token, db).call()
 }

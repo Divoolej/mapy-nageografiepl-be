@@ -6,8 +6,8 @@ pub fn generate() -> String {
     let mut rng = rand::thread_rng();
 
     for x in bytes.iter_mut() {
-      *x = rng.gen();
+        *x = rng.gen();
     }
 
-  base64::encode_config(bytes, base64::URL_SAFE)
+    base64::encode_config(bytes, base64::URL_SAFE)
 }

@@ -1,5 +1,5 @@
-mod sessions;
 mod create;
+mod sessions;
 
 use actix_web::{web, Scope};
 
