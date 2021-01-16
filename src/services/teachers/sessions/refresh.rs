@@ -46,11 +46,12 @@ impl<'a> Refresh<'a> {
   }
 
   pub fn call(self) -> Result<Session, RefreshErrors> {
-    self.validate()?
-        .get_session()?
-        .authenticate()?
-        .update_session()?
-        .finish()
+    self
+      .validate()?
+      .get_session()?
+      .authenticate()?
+      .update_session()?
+      .finish()
   }
 
   fn validate(self) -> Result<Self, RefreshErrors> {
@@ -74,8 +75,9 @@ impl<'a> Refresh<'a> {
     use crate::schema::sessions::dsl::*;
 
     match sessions
-        .filter(owner_type.eq("teacher").and(uuid.eq(&self.session_uuid)))
-        .first::<Session>(self.db) {
+      .filter(owner_type.eq("teacher").and(uuid.eq(&self.session_uuid)))
+      .first::<Session>(self.db)
+    {
       Ok(session) => {
         self.session = Some(session);
         Ok(self)
@@ -99,11 +101,12 @@ impl<'a> Refresh<'a> {
     use crate::schema::sessions::dsl::*;
 
     match diesel::update(&self.session.unwrap())
-        .set((
-          access_token.eq(token::generate()),
-          access_token_expires_at.eq(Utc::now() + Duration::days(1)),
-        ))
-        .get_result::<Session>(self.db) {
+      .set((
+        access_token.eq(token::generate()),
+        access_token_expires_at.eq(Utc::now() + Duration::days(1)),
+      ))
+      .get_result::<Session>(self.db)
+    {
       Ok(session) => {
         self.session = Some(session);
         Ok(self)
@@ -120,10 +123,6 @@ impl<'a> Refresh<'a> {
 }
 // </Refresh>
 
-pub fn refresh(
-  owner_uuid: String,
-  refresh_token: String,
-  db: &PgConnection,
-) -> Result<Session, RefreshErrors> {
+pub fn refresh(owner_uuid: String, refresh_token: String, db: &PgConnection) -> Result<Session, RefreshErrors> {
   Refresh::new(owner_uuid, refresh_token, db).call()
 }
