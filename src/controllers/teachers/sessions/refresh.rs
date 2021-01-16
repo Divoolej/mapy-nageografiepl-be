@@ -4,7 +4,7 @@ use log::error;
 use serde::{Serialize, Deserialize};
 
 use crate::{
-  db_connect,
+  db_connect, http_500,
   DbPool,
   services::teachers::sessions::{
     refresh,
@@ -41,15 +41,12 @@ pub async fn action(web::Path(session_uuid): web::Path<String>, db: web::Data<Db
       access_token: session.access_token,
       access_token_expires_at: session.access_token_expires_at,
     }),
-    Err(BlockingError::Error(refresh_errors)) => match refresh_errors {
+    Err(BlockingError::Error(service_errors)) => match service_errors {
       RefreshErrors::Multiple(errors) => HttpResponse::BadRequest().json(ErrorResponse { errors }),
       RefreshErrors::SessionNotFound => HttpResponse::NotFound().body("Not Found"),
       RefreshErrors::Unauthorized => HttpResponse::Unauthorized().body("Unauthorized"),
-      RefreshErrors::UnexpectedError => HttpResponse::InternalServerError().body("Unexpected error has occurred"),
+      RefreshErrors::UnexpectedError => http_500!(),
     },
-    Err(err) => {
-      error!("{:?}", err);
-      HttpResponse::InternalServerError().body("Unexpected error has occurred")
-    },
+    Err(BlockingError::Canceled) => http_500!(),
   }
 }

@@ -1,14 +1,25 @@
-use diesel::prelude::*;
-use diesel::result::{Error, DatabaseErrorKind};
-
+use diesel::{
+  prelude::*,
+  result::{Error, DatabaseErrorKind},
+};
 use regex::Regex;
 use serde::{Serialize, Serializer};
-
-use crate::{report_unexpected_err, handle_unexpected_err};
-use crate::schema::teachers;
-use crate::utils::password;
-use crate::models::Teacher;
 use uuid::Uuid;
+
+use crate::{
+  report_unexpected_err, handle_unexpected_err, make_serializable,
+  schema::teachers,
+  utils::password,
+  models::Teacher,
+};
+
+// <CreateErrors>
+#[derive(Debug)]
+pub enum CreateErrors {
+  Multiple(Vec<CreateError>),
+  UnexpectedError,
+}
+// </CreateErrors>
 
 // <CreateError>
 #[derive(Debug)]
@@ -19,23 +30,13 @@ pub enum CreateError {
   PasswordIsTooShort,
 }
 
-impl ToString for CreateError {
-  fn to_string(&self) -> String {
-    match self {
-      Self::EmailIsBlank => String::from("Email can't be blank"),
-      Self::EmailIsInvalid => String::from("Email is invalid"),
-      Self::PasswordIsBlank => String::from("Password can't be blank"),
-      // TODO: Give better feedback on password security
-      Self::PasswordIsTooShort => String::from("Password is too short (minimum is 8 characters)"),
-    }
-  }
-}
-
-impl Serialize for CreateError {
-  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-    serializer.serialize_str(&self.to_string())
-  }
-}
+make_serializable!(CreateError {
+    EmailIsBlank => "Email can't be blank",
+    EmailIsInvalid => "Email is invalid",
+    PasswordIsBlank => "Password can't be blank",
+    // TODO: Give better feedback on password security
+    PasswordIsTooShort => "Password is too short (minimum is 8 characters)",
+});
 // </CreateError>
 
 // <TeacherValues>
@@ -74,13 +75,13 @@ impl<'a> Create<'a> {
     }
   }
 
-  pub fn call(self) -> Result<(), Option<Vec<CreateError>>> {
+  pub fn call(self) -> Result<(), CreateErrors> {
     self.validate()?
         .insert_teacher()?
         .finish()
   }
 
-  fn validate(self) -> Result<Self, Option<Vec<CreateError>>> {
+  fn validate(self) -> Result<Self, CreateErrors> {
     let mut errors = vec![];
 
     // Email regex taken from the infamous https://stackoverflow.com/questions/201323/how-to-validate-an-email-address-using-a-regular-expression
@@ -101,18 +102,18 @@ impl<'a> Create<'a> {
     if errors.is_empty() {
       Ok(self)
     } else {
-      Err(Some(errors))
+      Err(CreateErrors::Multiple(errors))
     }
   }
 
-  fn insert_teacher(self) -> Result<Self, Option<Vec<CreateError>>> {
+  fn insert_teacher(self) -> Result<Self, CreateErrors> {
     let values = TeacherValues::new(
       &self.email,
       password::digest(&self.password)
           .map_err(|error| {
             // Report unexpected errors from argon2
             report_unexpected_err!(error);
-            None
+            CreateErrors::UnexpectedError
           })?,
     );
 
@@ -125,14 +126,14 @@ impl<'a> Create<'a> {
       // https://blog.rapid7.com/2017/06/15/about-user-enumeration
       Err(Error::DatabaseError(DatabaseErrorKind::UniqueViolation, _)) => Ok(self),
       // Handle unexpected database-level errors:
-      Err(error) => handle_unexpected_err!(error, None),
+      Err(error) => handle_unexpected_err!(error, CreateErrors::UnexpectedError),
     }
   }
 
-  fn finish(self) -> Result<(), Option<Vec<CreateError>>> { Ok(()) }
+  fn finish(self) -> Result<(), CreateErrors> { Ok(()) }
 }
 // </Create>
 
-pub fn create(email: String, password: String, db: &PgConnection) -> Result<(), Option<Vec<CreateError>>> {
+pub fn create(email: String, password: String, db: &PgConnection) -> Result<(), CreateErrors> {
   Create::new(email, password, db).call()
 }

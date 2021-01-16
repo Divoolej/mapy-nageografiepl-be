@@ -1,14 +1,21 @@
 use diesel::prelude::*;
 use diesel::result::Error;
-use log::error;
 use serde::{Serialize, Serializer};
 
-use crate::handle_unexpected_err;
+use crate::{make_serializable, handle_unexpected_err};
 use crate::schema::sessions;
 use crate::utils::{password, token};
 use crate::models::{Session, Teacher};
 use chrono::{DateTime, Utc, Duration};
 use uuid::Uuid;
+
+// <CreateErrors>
+#[derive(Debug)]
+pub enum CreateErrors {
+  UnexpectedError,
+  Multiple(Vec<CreateError>),
+}
+// </CreateErrors>
 
 // <CreateError>
 #[derive(Debug)]
@@ -19,21 +26,12 @@ pub enum CreateError {
   PasswordDoesntMatch,
 }
 
-impl ToString for CreateError {
-  fn to_string(&self) -> String {
-    match self {
-      Self::EmailIsBlank => String::from("Email can't be blank"),
-      Self::PasswordIsBlank => String::from("Password can't be blank"),
-      Self::EmailNotFound | Self::PasswordDoesntMatch => String::from("Invalid email/password combination"),
-    }
-  }
-}
-
-impl Serialize for CreateError {
-  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-    serializer.serialize_str(&self.to_string())
-  }
-}
+make_serializable!(CreateError {
+  EmailIsBlank => "Email can't be blank",
+  PasswordIsBlank => "Password can't be blank",
+  EmailNotFound => "Invalid email/password combination",
+  PasswordDoesntMatch => "Invalid email/password combination"
+});
 // </CreateError>
 
 // <SessionValues>
@@ -84,7 +82,7 @@ impl<'a> Create<'a> {
     }
   }
 
-  pub fn call(self) -> Result<Session, Option<Vec<CreateError>>> {
+  pub fn call(self) -> Result<Session, CreateErrors> {
     self.validate()?
         .get_teacher()?
         .authenticate()?
@@ -92,7 +90,7 @@ impl<'a> Create<'a> {
         .finish()
   }
 
-  fn validate(self) -> Result<Self, Option<Vec<CreateError>>> {
+  fn validate(self) -> Result<Self, CreateErrors> {
     let mut errors = vec![];
 
     if self.email.trim().is_empty() { errors.push(CreateError::EmailIsBlank); }
@@ -101,11 +99,11 @@ impl<'a> Create<'a> {
     if errors.is_empty() {
       Ok(self)
     } else {
-      Err(Some(errors))
+      Err(CreateErrors::Multiple(errors))
     }
   }
 
-  fn get_teacher(mut self) -> Result<Self, Option<Vec<CreateError>>> {
+  fn get_teacher(mut self) -> Result<Self, CreateErrors> {
     use crate::schema::teachers::dsl::*;
 
     match teachers
@@ -115,23 +113,23 @@ impl<'a> Create<'a> {
         self.teacher = Some(teacher);
         Ok(self)
       },
-      Err(Error::NotFound) => Err(Some(vec![CreateError::EmailNotFound])),
+      Err(Error::NotFound) => Err(CreateErrors::Multiple(vec![CreateError::EmailNotFound])),
       // Handle unexpected database-level errors:
-      Err(error) => handle_unexpected_err!(error, None),
+      Err(error) => handle_unexpected_err!(error, CreateErrors::UnexpectedError),
     }
   }
 
-  fn authenticate(self) -> Result<Self, Option<Vec<CreateError>>> {
+  fn authenticate(self) -> Result<Self, CreateErrors> {
     // It's safe to unwrap the teacher because we ensure it's presence in #get_teacher method
     match password::verify(&self.password, &self.teacher.as_ref().unwrap().password_digest) {
       Ok(true) => Ok(self),
-      Ok(false) => Err(Some(vec![CreateError::PasswordDoesntMatch])),
+      Ok(false) => Err(CreateErrors::Multiple(vec![CreateError::PasswordDoesntMatch])),
       // Handle unexpected errors from argon2:
-      Err(error) => handle_unexpected_err!(error, None),
+      Err(error) => handle_unexpected_err!(error, CreateErrors::UnexpectedError),
     }
   }
 
-  fn insert_session(mut self) -> Result<Self, Option<Vec<CreateError>>> {
+  fn insert_session(mut self) -> Result<Self, CreateErrors> {
     // It's safe to unwrap the teacher because we ensure it's presence in #get_teacher method
     let values = SessionValues::new(&self.teacher.as_ref().unwrap().uuid);
 
@@ -143,16 +141,17 @@ impl<'a> Create<'a> {
         Ok(self)
       },
       // Handle unexpected database-level errors:
-      Err(error) => handle_unexpected_err!(error, None),
+      Err(error) => handle_unexpected_err!(error, CreateErrors::UnexpectedError),
     }
   }
 
-  fn finish(self) -> Result<Session, Option<Vec<CreateError>>> {
-    self.session.ok_or(None)
+  fn finish(self) -> Result<Session, CreateErrors> {
+    // The unwrap is safe because session presence is ensured in #insert_session
+    Ok(self.session.unwrap())
   }
 }
 // </Create>
 
-pub fn create(email: String, password: String, db: &PgConnection) -> Result<Session, Option<Vec<CreateError>>> {
+pub fn create(email: String, password: String, db: &PgConnection) -> Result<Session, CreateErrors> {
   Create::new(email, password, db).call()
 }

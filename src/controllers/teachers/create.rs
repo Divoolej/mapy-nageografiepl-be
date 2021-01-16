@@ -3,11 +3,12 @@ use serde::{Serialize, Deserialize};
 use log::error;
 
 use crate::{
-  db_connect,
+  db_connect, http_500,
   DbPool,
   services::teachers::{
     create,
     CreateError,
+    CreateErrors,
   },
 };
 
@@ -35,12 +36,10 @@ pub async fn action(db: web::Data<DbPool>, params: web::Json<Params>) -> impl Re
     create(params.email, params.password,&conn)
   }).await {
     Ok(_) => HttpResponse::Created().json(SuccessResponse { }),
-    Err(BlockingError::Error(Some(errors))) => (
-      HttpResponse::BadRequest().json(ErrorResponse { errors })
-    ),
-    Err(err) => {
-      error!("{:?}", err);
-      HttpResponse::InternalServerError().body("Unexpected error has occurred")
+    Err(BlockingError::Error(service_errors)) => match service_errors {
+      CreateErrors::Multiple(errors) => HttpResponse::BadRequest().json(ErrorResponse { errors }),
+      CreateErrors::UnexpectedError => http_500!(),
     },
+    Err(BlockingError::Canceled) => http_500!(),
   }
 }

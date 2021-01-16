@@ -1,15 +1,15 @@
-use diesel::backend::Backend;
-use diesel::pg::Pg;
-use diesel::prelude::*;
-use diesel::result::Error;
-
+use chrono::{Utc, Duration};
+use diesel::{
+  prelude::*,
+  result::Error,
+};
 use serde::{Serialize, Serializer};
 
-use crate::handle_unexpected_err;
-use crate::schema::sessions;
-use crate::utils::{password, token};
-use crate::models::Session;
-use chrono::{DateTime, Utc, Duration};
+use crate::{
+  handle_unexpected_err, make_serializable,
+  utils::token,
+  models::Session,
+};
 
 // <RefreshErrors>
 #[derive(Debug)]
@@ -19,29 +19,19 @@ pub enum RefreshErrors {
   Unauthorized,
   Multiple(Vec<RefreshError>),
 }
-// </RefreshError>
+// </RefreshErrors>
 
-// <RefreshErrors>
+// <RefreshError>
 #[derive(Debug)]
 pub enum RefreshError {
   SessionUuidIsBlank,
   RefreshTokenIsBlank,
 }
 
-impl ToString for RefreshError {
-  fn to_string(&self) -> String {
-    match self {
-      Self::SessionUuidIsBlank => String::from("Session UUID can't be blank"),
-      Self::RefreshTokenIsBlank => String::from("Refresh token can't be blank")
-    }
-  }
-}
-
-impl Serialize for RefreshError {
-  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-    serializer.serialize_str(&self.to_string())
-  }
-}
+make_serializable!(RefreshError {
+  SessionUuidIsBlank => "Session UUID can't be blank",
+  RefreshTokenIsBlank => "Refresh token can't be blank"
+});
 // </RefreshError>
 
 // <Refresh>
