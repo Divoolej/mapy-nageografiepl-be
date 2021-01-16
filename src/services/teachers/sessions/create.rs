@@ -1,13 +1,11 @@
-use diesel::prelude::*;
-use diesel::result::Error;
-use serde::{Serialize, Serializer};
+use chrono::{DateTime, Duration, Utc};
+use diesel::{prelude::*, result::Error};
+use uuid::Uuid;
 
 use crate::models::{Session, Teacher};
+use crate::prelude::*;
 use crate::schema::sessions;
 use crate::utils::{password, token};
-use crate::{handle_unexpected_err, make_serializable};
-use chrono::{DateTime, Duration, Utc};
-use uuid::Uuid;
 
 // <CreateErrors>
 #[derive(Debug)]

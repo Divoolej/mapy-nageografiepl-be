@@ -1,13 +1,8 @@
 use actix_web::{patch, rt::blocking::BlockingError, web, HttpResponse, Responder};
 use chrono::{DateTime, Utc};
-use log::error;
-use serde::{Deserialize, Serialize};
 
-use crate::{
-  db_connect, http_500,
-  services::teachers::sessions::{refresh, RefreshError, RefreshErrors},
-  DbPool,
-};
+use crate::prelude::*;
+use crate::services::teachers::sessions::{refresh, RefreshError, RefreshErrors};
 
 #[derive(Deserialize)]
 pub struct Params {

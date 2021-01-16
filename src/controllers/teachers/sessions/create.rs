@@ -1,12 +1,7 @@
 use actix_web::{post, rt::blocking::BlockingError, web, HttpResponse, Responder};
-use log::error;
-use serde::{Deserialize, Serialize};
 
-use crate::{
-  db_connect, http_500,
-  services::teachers::sessions::{create, CreateError, CreateErrors},
-  DbPool,
-};
+use crate::prelude::*;
+use crate::services::teachers::sessions::{create, CreateError, CreateErrors};
 
 #[derive(Deserialize)]
 pub struct Params {

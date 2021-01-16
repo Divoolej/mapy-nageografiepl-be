@@ -1,8 +1,9 @@
 use chrono::{Duration, Utc};
 use diesel::{prelude::*, result::Error};
-use serde::{Serialize, Serializer};
 
-use crate::{handle_unexpected_err, make_serializable, models::Session, utils::token};
+use crate::models::Session;
+use crate::prelude::*;
+use crate::utils::token;
 
 // <RefreshErrors>
 #[derive(Debug)]

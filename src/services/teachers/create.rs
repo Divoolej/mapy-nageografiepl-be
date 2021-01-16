@@ -3,12 +3,12 @@ use diesel::{
   result::{DatabaseErrorKind, Error},
 };
 use regex::Regex;
-use serde::{Serialize, Serializer};
 use uuid::Uuid;
 
-use crate::{
-  handle_unexpected_err, make_serializable, models::Teacher, report_unexpected_err, schema::teachers, utils::password,
-};
+use crate::models::Teacher;
+use crate::prelude::*;
+use crate::schema::teachers;
+use crate::utils::password;
 
 // <CreateErrors>
 #[derive(Debug)]
