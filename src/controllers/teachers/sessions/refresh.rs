@@ -1,13 +1,8 @@
-use actix_web::{patch, rt::blocking::BlockingError, web, HttpResponse, Responder};
+use actix_web::{patch, rt::blocking::BlockingError, web, HttpRequest, HttpResponse, Responder};
 use chrono::{DateTime, Utc};
 
 use crate::prelude::*;
 use crate::services::teachers::sessions::{refresh, RefreshError, RefreshErrors};
-
-#[derive(Deserialize)]
-pub struct Params {
-  refresh_token: String,
-}
 
 #[derive(Serialize)]
 struct SuccessResponse {
@@ -22,14 +17,14 @@ struct ErrorResponse {
 
 #[patch("/{session_uuid}/refresh")]
 pub async fn action(
+  request: HttpRequest,
   web::Path(session_uuid): web::Path<String>,
   db: web::Data<DbPool>,
-  params: web::Json<Params>,
 ) -> impl Responder {
   let conn = db_connect!(db);
-  let params = params.into_inner();
+  let refresh_token: String = require_refresh_token!(request);
 
-  match web::block(move || refresh(session_uuid, params.refresh_token, &conn)).await {
+  match web::block(move || refresh(session_uuid, refresh_token, &conn)).await {
     Ok(session) => HttpResponse::Ok().json(SuccessResponse {
       access_token: session.access_token,
       access_token_expires_at: session.access_token_expires_at,

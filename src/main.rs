@@ -24,7 +24,10 @@ pub type DbPool = Pool<ConnectionManager<PgConnection>>;
 pub mod prelude {
   pub use crate::utils::errors::ROLLBAR_CLIENT;
   pub use crate::DbPool;
-  pub use crate::{db_connect, handle_unexpected_err, http_500, make_serializable, report_unexpected_err};
+  pub use crate::{
+    db_connect, handle_unexpected_err, http_401, http_500, make_serializable, report_unexpected_err,
+    require_refresh_token,
+  };
   pub use log::error;
   pub use serde::{Deserialize, Serialize, Serializer};
 }
@@ -32,7 +35,6 @@ pub mod prelude {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
   // Load ENVs
-  env::set_var("RUST_LOG", "debug");
   dotenv::dotenv().ok();
   // Set up logger
   env_logger::init();
