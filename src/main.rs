@@ -17,20 +17,20 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use std::env;
 use std::time::Duration;
 
-use crate::utils::errors::ROLLBAR_CLIENT;
-
 pub type DbPool = Pool<ConnectionManager<PgConnection>>;
 
 pub mod prelude {
-  pub use crate::utils::errors::ROLLBAR_CLIENT;
+  pub use crate::utils::globals::ROLLBAR_CLIENT;
   pub use crate::DbPool;
   pub use crate::{
-    db_connect, handle_unexpected_err, http_401, http_500, make_serializable, report_unexpected_err,
-    require_refresh_token,
+    db_connect, handle_unexpected_err, http_401, http_500, make_serializable,
+    report_unexpected_err, require_refresh_token,
   };
   pub use log::error;
   pub use serde::{Deserialize, Serialize, Serializer};
 }
+
+use prelude::*;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {

@@ -150,7 +150,7 @@ mod tests {
   }
 
   macro_rules! setup {
-    () => {
+    () => {{
       let test_connection = test_db();
       test_connection
         .begin_test_transaction()
@@ -158,52 +158,61 @@ mod tests {
 
       let user_email = String::from("valid@email.com");
       let user_password = String::from("password");
-    };
+      (test_connection, user_email, user_password)
+    }};
   }
 
   #[test]
   fn fails_when_email_is_blank() {
-    setup!();
+    let (test_connection, _, user_password) = setup!();
     let result = create("".into(), user_password, &test_connection);
     assert!(result.is_err());
   }
 
   #[test]
   fn fails_when_email_is_invalid() {
-    setup!();
+    let (test_connection, _, user_password) = setup!();
     let result = create("invalid".into(), user_password, &test_connection);
     assert!(result.is_err());
   }
 
   #[test]
   fn fails_when_password_is_too_short() {
-    setup!();
+    let (test_connection, user_email, _) = setup!();
     let result = create(
-      String::from("valid@email.com"),
+      String::from(user_email),
       String::from("pass"),
-      &test_db(),
+      &test_connection,
     );
     assert!(result.is_err());
   }
 
   #[test]
   fn fails_when_password_is_blank() {
-    setup!();
-    let result = create(
-      String::from("valid@email.com"),
-      String::from(""),
-      &test_db(),
-    );
+    let (test_connection, user_email, _) = setup!();
+    let result = create(String::from(user_email), String::from(""), &test_connection);
     assert!(result.is_err());
   }
 
   #[test]
   fn works_when_user_already_exists() {
-    setup!();
-    create(
-      "valid@email.com".into(),
-      "password".into(),
-      &test_connection,
-    );
+    use crate::schema::teachers::dsl::*;
+
+    let (test_connection, user_email, user_password) = setup!();
+    create(user_email.clone(), user_password.clone(), &test_connection)
+      .expect("Failed to create first user");
+    let count = teachers
+      .count()
+      .get_result::<i64>(&test_connection)
+      .expect("Failed to get the teacher count");
+    assert_eq!(count, 1);
+
+    assert!(create(user_email, user_password, &test_connection).is_ok());
+
+    let count = teachers
+      .count()
+      .get_result::<i64>(&test_connection)
+      .expect("Failed to get the teacher count");
+    assert_eq!(count, 1);
   }
 }
