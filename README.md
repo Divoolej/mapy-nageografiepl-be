@@ -10,6 +10,6 @@
 
 Created a `.env` based on the values inside `.env.example`.
 
-Prepare the database with `diesel migration run`.
+Prepare the database by running `diesel setup` in the `db` directory.
 
-Run the application with `cargo run --release`
+Run the application with `cargo run -p web`

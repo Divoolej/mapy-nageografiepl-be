@@ -1,0 +1,24 @@
+{
+	"folders":
+	[
+		{
+			"folder_exclude_patterns":
+			[
+				".idea",
+				"target"
+			],
+			"name": "mapy.nageografie.pl (BE)",
+			"path": "."
+		}
+	],
+	"settings":
+	{
+		"LSP":
+		{
+			"rust-analyzer":
+			{
+				"enabled": false
+			}
+		}
+	}
+}
