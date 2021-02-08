@@ -1,0 +1,11 @@
+*
+
+!docker/
+
+!app/
+!db/
+!web/
+
+!Cargo.toml
+!Cargo.lock
+!.env
